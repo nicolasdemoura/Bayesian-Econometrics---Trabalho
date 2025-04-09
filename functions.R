@@ -8,7 +8,6 @@
 
     # Prior
     log_prior <- function(delta, beta, gamma1, gamma2, Sigma) {
-        lp <- sum(dnorm(delta, 0, sd = sqrt(0.5), log = TRUE))
         
 
         return(lp)  # Prior up to constant
