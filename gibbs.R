@@ -1,3 +1,5 @@
+rm(list = ls())  # Clear the workspace
+
 library(MASS)  # For mvrnorm function
 library(dplyr)  # For data manipulation
 library(MCMCpack)
@@ -6,28 +8,27 @@ library(matrixsampling)
 library(progress)  # For progress bar
 
 # Gibbs sampler step for beta
-gibbs_sampler_beta <- function(y, X, Z, mu_beta_tilde_prior, V_beta_tilde_prior, s_prior, nu_prior, n_iter = 1000, burn_in = 100) {
+gibbs_sampler_beta <- function(y, X, Z, mu_beta_prior, V_beta_prior, mu_pi_prior, V_pi_prior, s_prior, nu_prior, n_iter = 1000, burn_in = 100) {
   
   # Storage matrices
-  n_beta <- length(mu_beta_tilde_prior)
-  beta_tilde_draws <- matrix(NA, nrow = n_iter, ncol = n_beta)
-  H_draws <- array(NA, dim = c(nrow(X)+nrow(Z), nrow(X)+nrow(Z), n_iter))
+  n_beta <- length(mu_beta_prior)
+  n_pi <- length(mu_pi_prior)
+  beta_draws <- matrix(NA, nrow = n_iter, ncol = n_beta)
+  pi_draws <- matrix(NA, nrow = n_iter, ncol = n_pi)
+  H_draws <- array(NA, dim = c(nrow(X), nrow(X), n_iter))
+  H_beta_draws <- array(NA, dim = c(nrow(X), nrow(X), n_iter))
+  H_pi_draws <- array(NA, dim = c(nrow(Z), nrow(Z), n_iter))
 
   # Set initial values
-  beta_tilde_draws[1, ] <- mu_beta_tilde_prior  # Initialize with prior mean
-  H_draws[, , 1] <- diag(100,nrow(X)+nrow(Z))  # Initialize with identity matrix
-
-  # Compute X_tilde
-  # Add ncol(Z) columns of 0s to X
-  X_zero <- cbind(X, matrix(0, nrow = nrow(X), ncol = ncol(Z)))  # Add columns of zeros to X
-  # Add ncol(X) columns of 0s to Z
-  Z_zero <- cbind(matrix(0, nrow = nrow(Z), ncol = ncol(X)),Z)  # Add columns of zeros to Z
-
-  X_tilde <- rbind(X_zero, Z_zero)
-  y_tilde <- c(y, X[,2])
+  beta_draws[1, ] <- mu_beta_prior 
+  pi_draws[1, ] <- mu_pi_prior
+  H_draws[, , 1] <- diag(100,nrow(X))  
+  H_beta_draws[, , 1] <- diag(100,nrow(X))  
+  H_pi_draws[, , 1] <- diag(100,nrow(Z))
 
   # Precompute inverses
-  V_beta_tilde_prior_inv <- solve(V_beta_tilde_prior)
+  V_beta_prior_inv <- solve(V_beta_prior)
+  V_pi_prior_inv <- solve(V_pi_prior)
   
   # Set up progress bar
   pb <- progress_bar$new(
@@ -36,23 +37,37 @@ gibbs_sampler_beta <- function(y, X, Z, mu_beta_tilde_prior, V_beta_tilde_prior,
     clear = FALSE,
     width = 60
   )
-
+  iter <- 2  # Initialize iteration counter
   for (iter in 2:n_iter) {
     # Update progress bar
     pb$tick()
+
+    # Select 2x2 submatrix of H for each equation
+    H_pi_draws[,,iter-1] <- H_draws[1:2, 1:2, iter-1]  # First stage equation
+    H_beta_draws[,,iter-1] <- H_draws[3:4, 3:4, iter-1]  # Structural equation
+
+    # Sample from posterior for Pi conditional on H and Beta
+    V_pi_n <- solve(V_pi_prior_inv + t(Z) %*% H_pi_draws[,,iter-1] %*% Z)
+    mu_pi_n <- V_pi_n %*% (V_pi_prior_inv %*% mu_pi_prior + t(Z) %*% H_pi_draws[,,iter-1] %*% y)
+    pi_sample <- MASS::mvrnorm(1, mu = mu_pi_n, Sigma = V_pi_n)
     
-    # Sample from posterior for Beta conditional on H
-    V_beta_tilde_n <- solve(V_beta_tilde_prior_inv + t(X_tilde) %*% H_draws[,,iter-1] %*% X_tilde)
-    mu_beta_tilde_n <- V_beta_tilde_n %*% (V_beta_tilde_prior_inv %*% mu_beta_tilde_prior + t(X_tilde) %*% H_draws[,,iter-1] %*% y_tilde)
-    beta_tilde_sample <- MASS::mvrnorm(1, mu = mu_beta_tilde_n, Sigma = V_beta_tilde_n)
+    # Sample from posterior for Beta conditional on H and Pi
+    V_beta_n <- solve(V_beta_prior_inv + t(X) %*% H_beta_draws[,,iter-1] %*% X)
+    mu_beta_n <- V_beta_n %*% (V_beta_prior_inv %*% mu_beta_prior + t(X) %*% H_beta_draws[,,iter-1] %*% y)
+    beta_sample <- MASS::mvrnorm(1, mu = mu_beta_n, Sigma = V_beta_n)
 
     # Store draw
-    beta_tilde_draws[iter, ] <- beta_tilde_sample
-  
-    # Sample from posterior for H conditional on Beta
-    eps_tilde <- y_tilde - X_tilde %*% beta_tilde_sample  # Residuals
+    pi_draws[iter, ] <- pi_sample
+    beta_draws[iter, ] <- beta_sample
+
+    # Sample from posterior for H conditional on Beta and Pi
+    eps <- y - X %*% beta_sample
+    u <- X[,2] - Z %*% pi_sample 
+    eps_tilde <- cbind(eps, u) 
+
+    # Sample from the inverse-Wishart distribution
     s_n <- s_prior + eps_tilde %*% t(eps_tilde)  # Posterior scale parameter
-    nu_n <- nu_prior + nrow(X_tilde)  # Posterior degrees of freedom
+    nu_n <- nu_prior + nrow(X)  # Posterior degrees of freedom
     H_sample <- rinvwishart(1, nu_n, s_n)  # Inverse-Wishart sample
 
     # Store draw
@@ -89,9 +104,9 @@ simulate_data <- function(n, beta, pi, Sigma) {
   return(data.frame(y = y, X = X, Z = Z))
 }
 
-n <- 150  # Number of observations
-beta <- as.matrix(c(30,2), transpose = TRUE)  # Coefficient for the structural equation
-pi <- as.matrix(c(50, 0.25), transpose = TRUE)  # Coefficient for the first stage equation
+n <- 50  # Number of observations
+beta <- as.matrix(c(-15,2), transpose = TRUE)  # Coefficient for the structural equation
+pi <- as.matrix(c(20, 2.5), transpose = TRUE)  # Coefficient for the first stage equation
 Sigma <- matrix(c(1, 0.5, 0.5, 1), nrow = 2)  # Covariance matrix for the error terms
 
 ds <- simulate_data(n, beta, pi, Sigma)  # Simulate data 
@@ -100,9 +115,12 @@ Z <- cbind(ds$Z.1, ds$Z.2)  # Instrumental variable matrix (including intercept)
 y <- ds$y  # Dependent variable
 
 # Set the parameters for the Gibbs sampler
-mu_beta_tilde_prior <- c(40,1,40,1)
-V_beta_tilde_prior <- diag(5, nrow = 4)  # Prior covariance matrix for beta
-s_prior <- diag(5, nrow = nrow(X)+nrow(Z))  # Prior scale matrix for the error terms
+mu_beta_prior <- c(0,0)
+V_beta_prior <- diag(c(50,1))
+mu_pi_prior <- c(0,0)
+V_pi_prior <- diag(c(50,1))
+
+s_prior <- diag(5, nrow = nrow(X))  # Prior scale matrix for the error terms
 nu_prior <- 5  # Prior degrees of freedom for the error terms
 
 # Set the n_iter and burn_in parameters
@@ -110,7 +128,7 @@ n_iter <- 10000  # Number of iterations for the Gibbs sampler
 burn_in <- 1000  # Number of burn-in iterations
 
 # Run the Gibbs sampler
-gibbs_results <- gibbs_sampler_beta(y, X, Z, mu_beta_tilde_prior, V_beta_tilde_prior, s_prior, nu_prior, n_iter, burn_in) 
+gibbs_results <- gibbs_sampler_beta(y, X, Z, mu_beta_prior, V_beta_prior, mu_pi_prior, V_pi_prior, s_prior, nu_prior, n_iter, burn_in) 
 
 # Extract the posterior draws
 beta_draws <- gibbs_results$beta_draws
