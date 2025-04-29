@@ -1,0 +1,52 @@
+% --- Set document class and font size ---
+
+\documentclass[12pt]{article}
+
+% --- Package imports ---
+\input{packages}
+\input{preamble}
+\input{nicoeconomics}
+
+
+% Create a question environment
+\newenvironment{questions}{\begin{enumerate}}{\end{enumerate}}
+\newcommand{\question}{\item}
+
+\usepackage{fancyhdr}
+
+% Include a line underneath the header, no footer line
+\pagestyle{fancy}
+\renewcommand{\footrulewidth}{0pt}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Left header text: course name/assignment number
+\lhead{FGV EESP\\CMCD}
+
+% Right header text: your name
+\chead{Nicolas Goulart de Moura}
+% Right header text: your name
+\rhead{Bayesian Econometrics\\\today}
+
+% Set the directory for figures and tables as ./
+\graphicspath{{figures/}{tables/}}
+
+
+% Do not have headers after the first page
+% --- Document starts here ---
+
+\begin{document}
+\null
+\vspace{-1cm}
+\begin{center}\LARGE \textsc{Short Paper}\footnote{All data and code are available on https://github.com/nicolasdemoura/Bayesian-Econometrics---Trabalho/} \end{center}
+% --- Main content: import exercises as subfiles ---
+
+\input{Body/introduction} 
+\input{Body/simulation}  
+\input{Body/replication} 
+
+% --- Bibliography --
+
+\bibliographystyle{chicago}
+\bibliography{references}
+
+\end{document}

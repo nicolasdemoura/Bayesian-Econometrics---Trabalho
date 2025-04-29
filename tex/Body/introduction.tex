@@ -1,0 +1,69 @@
+\section{Background}
+
+Instrumental Variables (IV) methods are a classical tool in econometrics to estimate causal effects in the presence of endogenous regressors. Endogeneity may arise due to omitted variables, measurement error, or simultaneous causality. A valid instrument \( Z \) must satisfy two key conditions: (i) \emph{relevance}, meaning it is correlated with the endogenous regressor \( X \); and (ii) \emph{exogeneity}, meaning it affects the dependent variable \( Y \) only through \( X \) and not directly.
+
+The structural model and the first-stage equation we consider are given by:
+\begin{align}
+    Y_i &= \beta X_i + \gamma Z_i + \delta W_i + \varepsilon_i, \\
+    X_i &= \pi Z_i + \phi W_i + u_i,
+\end{align}
+where \( W \) is an exogenous covariate included to control for observable confounders, and \( (\varepsilon_i, u_i) \) are jointly normally distributed error terms.
+
+In the frequentist framework, the \emph{exclusion restriction} is typically formalized as \( \gamma = 0 \), meaning that \( Z \) has no direct effect on \( Y \) once \( X \) and \( W \) are controlled for. A useful way to understand the exclusion restriction is to think about an applied econometrician presenting her research in a seminar. Suppose she uses distance to the nearest college as an instrument for years of education when studying the effect of education on wages. During the seminar, she argues that distance to college affects earnings only through its impact on schooling decisions and provides institutional details, robustness checks, and intuitive stories to support this claim.
+
+If she is convincing enough, her colleagues might be willing to accept that the exclusion restriction is approximately valid --- that is, that any direct effect of distance on earnings, not operating through education, must be small. In this case, we would describe her instrument as \emph{plausibly exogenous}.
+
+However, from a frequentist perspective, valid inference requires that the exclusion restriction holds exactly, that is, that $\gamma = 0$. If $\gamma$ were actually different from zero, even slightly, the frequentist IV estimator would be inconsistent and the analysis would fail to recover the true causal effect.
+
+The Bayesian framework offers a natural solution to this problem. Instead of imposing a sharp hypothesis $\gamma = 0$, we can express uncertainty about the exclusion restriction directly by placing a prior distribution on $\gamma$ centered at zero, but allowing for small deviations. This ``softens'' the exclusion restriction and enables a more realistic and robust approach to causal inference when instruments are only plausibly exogenous.
+
+The paper by \cite{conleyPlausiblyExogenous2012} proposes multiple strategies to relax the strict exclusion assumption, including two frequentist methods -- such as confidence sets that allow for bounded violation under support restrictions -- and two Bayesian methods. In this work, we follow the full Bayesian specification approach, focusing on the scalar case where both \( X \) and \( Z \) are univariate for simplicity.
+
+\section{Estimation} 
+
+We adopt a fully Bayesian approach to estimation. We define the vector of first-stage coefficients as $\bftau = (\pi, \phi)'$ and the vector of structural equation coefficients as $\bftheta = (\beta, \gamma, \delta)'$. The error terms $(\varepsilon_i, u_i)'$ are jointly normally distributed with covariance matrix $\Sigma$. 
+
+The prior distributions are specified as follows:
+\begin{itemize}
+    \item $\bftau \sim \mathcal{N}(\mu_{\tau}, V_{\tau})$
+    \item $\bftheta \sim \mathcal{N}(\mu_{\theta}, V_{\theta})$
+    \item $\Sigma \sim \mathcal{IW}(\nu_0, S_0)$, the Inverse-Wishart distribution with $\nu_0 = 3$ degrees of freedom and scale matrix $S_0 = I_2$.
+\end{itemize}
+
+Inference is conducted via a Gibbs sampler that iteratively draws from the full conditional distributions:
+
+\begin{itemize}
+    \item Set initial values for $\bftau^{(0)}$, $\bftheta^{(0)}$, and $\Sigma^{(0)}$.
+    \item Iterate over $i = 0, \ldots, N-1$:
+    \begin{itemize}
+    \item \textbf{Draw $\bftau^{(i+1)}$ given $\Sigma^{(i)}$:} 
+    \begin{align*}
+        \bftau^{(i+1)} \mid \Sigma^{(i)}, X, Z, W &\sim \mathcal{N}(\mu_{\tau}^{\text{post}}, V_{\tau}^{\text{post}}),
+    \end{align*}
+    where
+    \begin{align*}
+        V_{\tau}^{\text{post}} &= \left( V_{\tau}^{-1} + \frac{[Z,W]'[Z,W]}{\sigma_u^2} \right)^{-1}, \\
+        \mu_{\tau}^{\text{post}} &= V_{\tau}^{\text{post}} \left( V_{\tau}^{-1}\mu_{\tau} + \frac{[Z,W]'X}{\sigma_u^2} \right),
+    \end{align*}
+    and $\sigma_u^2 = \Sigma_{22}^{(i)}$, the variance of the first-stage error.
+
+    \item \textbf{Draw $\bftheta^{(i+1)}$ given $\bftau^{(i+1)}$ and $\Sigma^{(i)}$:}
+    \begin{align*}
+        \bftheta^{(i+1)} \mid \bftau^{(i+1)}, \Sigma^{(i)}, Y, X, Z, W &\sim \mathcal{N}(\mu_{\theta}^{\text{post}}, V_{\theta}^{\text{post}}),
+    \end{align*}
+    where
+    \begin{align*}
+        V_{\theta}^{\text{post}} &= \left( V_{\theta}^{-1} + \frac{[\hat{X},Z,W]'[\hat{X},Z,W]}{\sigma_\varepsilon^2} \right)^{-1}, \\
+        \mu_{\theta}^{\text{post}} &= V_{\theta}^{\text{post}} \left( V_{\theta}^{-1}\mu_{\theta} + \frac{[\hat{X},Z,W]'Y}{\sigma_\varepsilon^2} \right),
+    \end{align*}
+    and $\sigma_\varepsilon^2 = \Sigma_{11}^{(i)}$ and $\hat{X}=\pi^{(i+1)}\cdot Z + \phi^{(i+1)}\cdot W$ the variance of the structural equation error.
+
+    \item \textbf{Draw $\Sigma^{(i+1)}$ given $\bftau^{(i+1)}$ and $\bftheta^{(i+1)}$:}
+    \begin{align*}
+        \Sigma^{(i+1)} \mid \bftau^{(i+1)}, \bftheta^{(i+1)}, Y, X, Z, W &\sim \mathcal{IW}\left( \nu_0 + N, S_0 + \sum_{i=1}^N \mathbf{e}_i \mathbf{e}_i' \right),
+    \end{align*}
+    where $\mathbf{e}_i = (Y_i - \beta^{(i+1)} X_i - \gamma^{(i+1)} Z_i - \delta^{(i+1)} W_i, X_i - \pi^{(i+1)} Z_i - \phi^{(i+1)} W_i)'$ are the residuals from the structural and first-stage equations.
+\end{itemize}
+\end{itemize}
+
+These steps are iterated for a large number of draws, discarding an initial burn-in period to ensure convergence to the posterior distribution. In our simulation and replication studies, we run the Gibbs sampler for 10,000 iterations, discarding the first 2,000 as burn-in.

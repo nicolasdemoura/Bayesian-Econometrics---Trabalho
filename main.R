@@ -3,7 +3,7 @@
 # Instructor: Eduardo Mendes
 # Course: Bayesian Econometrics
 # Autor: Nícolas de Moura
-# Goal: Replicate Conley, Hansen and Rossi (2012)'s paper ``Plausibly Exogenous'' 
+# Goal: Replicate Conley, Hansen and Rossi (2012)'s paper ``Plausibly Exogenous'' for simulated data
 ###############################################################################
 # Organize the working environment
 ###############################################################################
@@ -23,7 +23,7 @@ set.seed(20250415)
 source("functions.R")  # Import the functions
 
 ###############################################################################
-# Main Simulation
+# First Study: Main Simulation
 ###############################################################################
 
 # Set parameters for the simulation
@@ -31,8 +31,8 @@ N <- 150  # Number of observations
 
 # Coefficients for the structural equation and first stage equation
 beta_true <- 2
-gamma_true <- 20
-delta_true <- 1
+gamma_true <- 0
+delta_true <- -1
 pi_true <- 2
 phi_true <- 1
 Sigma <- matrix(c(1, 0.5, 0.5, 1), nrow = 2)  # Covariance matrix for the errors
@@ -42,8 +42,8 @@ ds <- simulate_data(N, beta_true, gamma_true, delta_true, pi_true, phi_true, Sig
 
 # Run the MCMC sampler
 results <- MCMC_plausibly_exogenous(ds, n_iter = 10000, burn_in = 2000,
-                                     mu_tau = rep(0, 2), V_tau = diag(c(1, 1000)),
-                                     mu_theta = rep(0, 3), V_theta = diag(c(1, 0.0001, 1000)),
+                                     mu_tau = rep(0, 2), V_tau = diag(c(10, 10)),
+                                     mu_theta = rep(0, 3), V_theta = diag(c(10, 0.0001, 10)),
                                      nu0 = 3, S0 = diag(2))  # Run the MCMC sampler
 
 # Extract the samples
@@ -60,26 +60,220 @@ summary(theta_samples)  # Summary statistics for theta samples
 ###########################################################################
 
 # Plot the trace plots for tau and theta
-plot(tau_samples[, 1], type = "l", main = "Trace plot for tau[1]", ylab = "tau[1]")  # Trace plot for tau[1]
-plot(tau_samples[, 2], type = "l", main = "Trace plot for tau[2]", ylab = "tau[2]")  # Trace plot for tau[2]
-plot(theta_samples[, 1], type = "l", main = "Trace plot for theta[1]", ylab = "theta[1]")  # Trace plot for theta[1]
-plot(theta_samples[, 2], type = "l", main = "Trace plot for theta[2]", ylab = "theta[2]")  # Trace plot for theta[2]
-plot(theta_samples[, 3], type = "l", main = "Trace plot for theta[3]", ylab = "theta[3]")  # Trace plot for theta[3]
+gg <- ggplot(tau_samples, aes(x = 1:nrow(tau_samples), y = tau_samples[, 1])) + geom_line(size=1.5) + labs(x="Iteration", y=expression(pi))
+gg_template_save(gg, "figures/simulation/trace_pi.png")
+
+gg <- ggplot(tau_samples, aes(x = 1:nrow(tau_samples), y = tau_samples[, 2])) + geom_line(size=1.5) + labs(x="Iteration", y=expression(phi))
+gg_template_save(gg, "figures/simulation/trace_phi.png")
+
+gg <- ggplot(theta_samples, aes(x = 1:nrow(theta_samples), y = theta_samples[, 1])) + geom_line(size=1.5) + labs(x="Iteration", y=expression(beta))
+gg_template_save(gg, "figures/simulation/trace_beta.png")
+
+gg <- ggplot(theta_samples, aes(x = 1:nrow(theta_samples), y = theta_samples[, 2])) + geom_line(size=1.5) + labs(x="Iteration", y=expression(gamma))
+gg_template_save(gg, "figures/simulation/trace_gamma.png")
+
+gg <- ggplot(theta_samples, aes(x = 1:nrow(theta_samples), y = theta_samples[, 3])) + geom_line(size=1.5) + labs(x="Iteration", y=expression(delta))
+gg_template_save(gg, "figures/simulation/trace_delta.png")
+
+# ACF for tau and theta
+acf <- acf(tau_samples[, 1], plot = FALSE)
+gg <- ggplot(data.frame(lag = acf$lag, acf = acf$acf), aes(x=lag, y=acf)) + 
+  geom_bar(stat="identity") + labs(x="Lag", y=expression(pi)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gg_template_save(gg, "figures/simulation/acf_pi.png")
+
+acf <- acf(tau_samples[, 2], plot = FALSE)
+gg <- ggplot(data.frame(lag = acf$lag, acf = acf$acf), aes(x=lag, y=acf)) +
+  geom_bar(stat="identity") + labs(x="Lag", y=expression(phi)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gg_template_save(gg, "figures/simulation/acf_phi.png")
+
+acf <- acf(theta_samples[, 1], plot = FALSE)
+gg <- ggplot(data.frame(lag = acf$lag, acf = acf$acf), aes(x=lag, y=acf)) +
+  geom_bar(stat="identity") + labs(x="Lag", y=expression(beta)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gg_template_save(gg, "figures/simulation/acf_beta.png")
+
+acf <- acf(theta_samples[, 2], plot = FALSE)
+gg <- ggplot(data.frame(lag = acf$lag, acf = acf$acf), aes(x=lag, y=acf)) +
+  geom_bar(stat="identity") + labs(x="Lag", y=expression(gamma)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gg_template_save(gg, "figures/simulation/acf_gamma.png")
+
+acf <- acf(theta_samples[, 3], plot = FALSE)
+gg <- ggplot(data.frame(lag = acf$lag, acf = acf$acf), aes(x=lag, y=acf)) +
+  geom_bar(stat="identity") + labs(x="Lag", y=expression(delta)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gg_template_save(gg, "figures/simulation/acf_delta.png")
 
 # Histograms for tau and theta
-hist(tau_samples[, 1], main = "Histogram of tau[1]", xlab = "tau[1]", breaks = 50)  # Histogram of tau[1]
-hist(tau_samples[, 2], main = "Histogram of tau[2]", xlab = "tau[2]", breaks = 50)  # Histogram of tau[2]
-hist(theta_samples[, 1], main = "Histogram of theta[1]", xlab = "theta[1]", breaks = 50)  # Histogram of theta[1]
-hist(theta_samples[, 2], main = "Histogram of theta[2]", xlab = "theta[2]", breaks = 50)  # Histogram of theta[2]
-hist(theta_samples[, 3], main = "Histogram of theta[3]", xlab = "theta[3]", breaks = 50)  # Histogram of theta[3]
+gg <- ggplot(data.frame(val = tau_samples[, 1]), aes(x = val)) + 
+  geom_histogram(aes(y = ..density..), bins = 50) +
+  labs(x = expression(pi), y = "Density") + 
+  geom_vline(xintercept = pi_true, color = "red", linetype = "dashed", size = 1)
+gg_template_save(gg, "figures/simulation/hist_pi.png")
+
+gg <- ggplot(data.frame(val = tau_samples[, 2]), aes(x = val)) + 
+  geom_histogram(aes(y = ..density..), bins = 50) +
+  labs(x = expression(phi), y = "Density") + 
+  geom_vline(xintercept = phi_true, color = "red", linetype = "dashed", size = 1)
+gg_template_save(gg, "figures/simulation/hist_phi.png")
+
+gg <- ggplot(data.frame(val = theta_samples[, 1]), aes(x = val)) + 
+  geom_histogram(aes(y = ..density..), bins = 50) +
+  labs(x = expression(beta), y = "Density") + 
+  geom_vline(xintercept = beta_true, color = "red", linetype = "dashed", size = 1)
+gg_template_save(gg, "figures/simulation/hist_beta.png")
+
+gg <- ggplot(data.frame(val = theta_samples[, 2]), aes(x = val)) + 
+  geom_histogram(aes(y = ..density..), bins = 50) +
+  labs(x = expression(gamma), y = "Density") + 
+  geom_vline(xintercept = gamma_true, color = "red", linetype = "dashed", size = 1)
+gg_template_save(gg, "figures/simulation/hist_gamma.png")
+
+gg <- ggplot(data.frame(val = theta_samples[, 3]), aes(x = val)) + 
+  geom_histogram(aes(y = ..density..), bins = 50) +
+  labs(x = expression(delta), y = "Density") + 
+  geom_vline(xintercept = delta_true, color = "red", linetype = "dashed", size = 1)
+gg_template_save(gg, "figures/simulation/hist_delta.png")
+
+# Create tex table for effective sample size
+simulation_results <- data.frame(
+  "Parameter" = c("pi", "phi", "beta", "gamma", "delta"),
+  "True Value" = c(pi_true, phi_true, beta_true, gamma_true, delta_true),
+  "Mean" = c(mean(tau_samples[, 1]), mean(tau_samples[, 2]), mean(theta_samples[, 1]), mean(theta_samples[, 2]), mean(theta_samples[, 3])),
+  "Standard Deviation" = c(sd(tau_samples[, 1]), sd(tau_samples[, 2]), sd(theta_samples[, 1]), sd(theta_samples[, 2]), sd(theta_samples[, 3])),
+  "0.025 Quantile" = c(quantile(tau_samples[, 1], 0.025), quantile(tau_samples[, 2], 0.025), quantile(theta_samples[, 1], 0.025), quantile(theta_samples[, 2], 0.025), quantile(theta_samples[, 3], 0.025)),
+  "0.975 Quantile" = c(quantile(tau_samples[, 1], 0.975), quantile(tau_samples[, 2], 0.975), quantile(theta_samples[, 1], 0.975), quantile(theta_samples[, 2], 0.975), quantile(theta_samples[, 3], 0.975)),
+  "Effective Sample Size" = c(effectiveSize(tau_samples[, 1]), effectiveSize(tau_samples[, 2]), effectiveSize(theta_samples[, 1]), effectiveSize(theta_samples[, 2]), effectiveSize(theta_samples[, 3]))
+)
+colnames(simulation_results) <- c("Parameter", "True Value", "Mean", "Standard Deviation", "0.025", "0.975", "Effective Sample Size")  # Set column
+
+stargazer(simulation_results, type = "latex", title = "Simulation Results", summary = FALSE, rownames = FALSE, digits.extra = 0, digits = 2, out = "tables/simulation/simulation_results.tex", label = "tab:simulation_results")
+
 
 ##############################################################################
-# Iterate over the variance of gamma    
+# Second Study: Four different models 
+##############################################################################
+
+# Set parameters for the simulation
+N <- 150  # Number of observations
+
+########### Baseline model 
+
+# Coefficients for the structural equation and first stage equation
+beta_true <- 2
+gamma_true <- 0
+delta_true <- -1
+pi_true <- 2
+phi_true <- 1
+Sigma <- matrix(c(1, 0.5, 0.5, 1), nrow = 2)  # Covariance matrix for the errors
+
+# Simulate data
+ds <- simulate_data(N, beta_true, gamma_true, delta_true, pi_true, phi_true, Sigma)  # Simulate data
+
+# Run the MCMC sampler
+results <- MCMC_plausibly_exogenous(ds, n_iter = 10000, burn_in = 2000,
+                                     mu_tau = rep(0, 2), V_tau = diag(c(10, 10)),
+                                     mu_theta = rep(0, 3), V_theta = diag(c(10, 0.0001, 10)),
+                                     nu0 = 3, S0 = diag(2))  # Run the MCMC sampler
+
+# Extract the samples
+theta_samples <- results$theta_samples  # Extract theta samples
+
+model <- c(
+  mean(theta_samples[, 1]),  # Posterior mean of beta
+  sd(theta_samples[, 1]),  # Posterior standard deviation of beta
+  quantile(theta_samples[, 1], 0.025),  # Lower CI for beta
+  quantile(theta_samples[, 1], 0.975)   # Upper CI for beta
+)
+models <- as.data.frame(model)  # Combine the results
+
+########### Weak Instrument model -> Add noise to Z
+
+# Simulate data
+ds <- simulate_data(N, beta_true, gamma_true, delta_true, pi_true, phi_true, Sigma)  # Simulate data
+ds$Z <- ds$Z + rnorm(N, 0, 10)  # Add noise to Z
+
+# Run the MCMC sampler
+results <- MCMC_plausibly_exogenous(ds, n_iter = 10000, burn_in = 2000,
+                                     mu_tau = rep(0, 2), V_tau = diag(c(10, 10)),
+                                     mu_theta = rep(0, 3), V_theta = diag(c(10, 0.0001, 10)),
+                                     nu0 = 3, S0 = diag(2))  # Run the MCMC sampler
+
+# Extract the samples
+theta_samples <- results$theta_samples  # Extract theta samples
+
+model <- c(
+  mean(theta_samples[, 1]),  # Posterior mean of beta
+  sd(theta_samples[, 1]),  # Posterior standard deviation of beta
+  quantile(theta_samples[, 1], 0.025),  # Lower CI for beta
+  quantile(theta_samples[, 1], 0.975)   # Upper CI for beta
+)
+models <- cbind(models, model)  # Combine the results
+
+########### Uncertain Instrument model -> Increase prior variance of gamma
+
+# Simulate data
+ds <- simulate_data(N, beta_true, gamma_true, delta_true, pi_true, phi_true, Sigma)  # Simulate data
+
+# Run the MCMC sampler
+results <- MCMC_plausibly_exogenous(ds, n_iter = 10000, burn_in = 2000,
+                                     mu_tau = rep(0, 2), V_tau = diag(c(10, 10)),
+                                     mu_theta = rep(0, 3), V_theta = diag(c(10, 1, 10)),
+                                     nu0 = 3, S0 = diag(2))  # Run the MCMC sampler
+
+# Extract the samples
+theta_samples <- results$theta_samples  # Extract theta samples
+
+model <- c(
+  mean(theta_samples[, 1]),  # Posterior mean of beta
+  sd(theta_samples[, 1]),  # Posterior standard deviation of beta
+  quantile(theta_samples[, 1], 0.025),  # Lower CI for beta
+  quantile(theta_samples[, 1], 0.975)   # Upper CI for beta
+)
+models <- cbind(models, model)  # Combine the results
+
+########### Invalid Instrument model -> gamma_true != 0
+
+gamma_true <- 10
+
+# Simulate data
+ds <- simulate_data(N, beta_true, gamma_true, delta_true, pi_true, phi_true, Sigma)  # Simulate data
+
+# Run the MCMC sampler
+results <- MCMC_plausibly_exogenous(ds, n_iter = 10000, burn_in = 2000,
+                                     mu_tau = rep(0, 2), V_tau = diag(c(10, 10)),
+                                     mu_theta = rep(0, 3), V_theta = diag(c(10, 0.0001, 10)),
+                                     nu0 = 3, S0 = diag(2))  # Run the MCMC sampler
+
+# Extract the samples
+theta_samples <- results$theta_samples  # Extract theta samples
+
+model <- c(
+  mean(theta_samples[, 1]),  # Posterior mean of beta
+  sd(theta_samples[, 1]),  # Posterior standard deviation of beta
+  quantile(theta_samples[, 1], 0.025),  # Lower CI for beta
+  quantile(theta_samples[, 1], 0.975)   # Upper CI for beta
+)
+
+models <- cbind(models, model)  # Combine the results
+models <- t(models)
+
+colnames(models) <- c("Mean", "Standard Deviation", "Lower CI", "Upper CI")  # Set row names for the data frame
+rownames(models) <- c("Baseline", "Weak Instrument", "Uncertain Instrument", "Invalid Instrument")  # Set column names for the data frame
+models
+
+# Create tex table for models
+stargazer(models, type = "latex", title = "Simulation Results", summary = FALSE, rownames = TRUE, digits.extra = 0, digits = 2, out = "tables/simulation/models.tex", label = "tab:models")
+
+##############################################################################
+# Third Study: Iterate over the variance of gamma    
 ##############################################################################
 
 # Initialize a vector with the true values of gamma
 gamma_true_values <- c(0, 1, 5, 10, 20)  # True values of gamma
-gamma_variances <- c(0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1)  # Variances of gamma
+gamma_variances <- c(0.0001, 0.001, 0.01, 0.1, 1, 10, 100)
 
 # Initialize a matrix to store the means of theta
 # Empty matrix with 0 rows and 5 columns
@@ -135,9 +329,9 @@ gg <- ggplot(theta_stats, aes(x = log10(Prior_Variance), y = Beta_Mean, color = 
   scale_color_brewer(palette = "Dark2", name = "True Gamma") +  # Colorblind-friendly palette for lines
   scale_fill_brewer(palette = "Dark2", name = "True Gamma") +  # Colorblind-friendly palette for ribbons
   labs(
-    title = "Posterior Mean and CI for Beta by True Gamma",
+    title = "",
     x = "Log10(Prior Variance of Gamma)",
-    y = "Posterior Mean (and CI)"
+    y = "Posterior Mean (and CI) of Beta"
   ) +
   theme_bw(base_size = 18) +
   theme(
@@ -151,7 +345,7 @@ gg <- ggplot(theta_stats, aes(x = log10(Prior_Variance), y = Beta_Mean, color = 
 
 # Save the plot
 ggsave(
-  filename = "figures/plot_overlapping_gamma.png",
+  filename = "figures/simulation/plot_prior_gamma.png",
   plot = gg,
   width = 12,
   height = 8
